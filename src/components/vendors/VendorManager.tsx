@@ -14,23 +14,38 @@ import { Card } from '../common/Card';
 import { Modal } from '../common/Modal';
 import { Vendor, VendorStatus, ExpenseCategory } from '../../types';
 import { formatINR, CATEGORY_LABELS } from '../../utils/budgetCalculations';
+import { sanitizeTextInput } from '../../utils/validators';
+
+interface VendorFormData {
+  name: string;
+  category: ExpenseCategory;
+  contactPerson: string;
+  phone: string;
+  email: string;
+  quotedAmount: string;
+  status: VendorStatus;
+  notes: string;
+  bookingVerified: boolean;
+}
+
+const DEFAULT_FORM_DATA: VendorFormData = {
+  name: '',
+  category: 'catering',
+  contactPerson: '',
+  phone: '',
+  email: '',
+  quotedAmount: '',
+  status: 'not_contacted',
+  notes: '',
+  bookingVerified: false,
+};
 
 export const VendorManager: React.FC = () => {
   const { activeEvent, addVendor, updateVendor, deleteVendor, showToast } = useEvent();
 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingVendor, setEditingVendor] = useState<Vendor | null>(null);
-
-  // Form states
-  const [name, setName] = useState('');
-  const [category, setCategory] = useState<ExpenseCategory>('catering');
-  const [contactPerson, setContactPerson] = useState('');
-  const [phone, setPhone] = useState('');
-  const [email, setEmail] = useState('');
-  const [quotedAmount, setQuotedAmount] = useState('');
-  const [status, setStatus] = useState<VendorStatus>('contacted');
-  const [notes, setNotes] = useState('');
-  const [bookingVerified, setBookingVerified] = useState(false);
+  const [formData, setFormData] = useState<VendorFormData>(DEFAULT_FORM_DATA);
 
   if (!activeEvent) {
     return (
@@ -42,65 +57,73 @@ export const VendorManager: React.FC = () => {
 
   const handleOpenAdd = () => {
     setEditingVendor(null);
-    setName('');
-    setCategory('catering');
-    setContactPerson('');
-    setPhone('');
-    setEmail('');
-    setQuotedAmount('');
-    setStatus('not_contacted');
-    setNotes('');
-    setBookingVerified(false);
+    setFormData(DEFAULT_FORM_DATA);
     setIsAddModalOpen(true);
   };
 
   const handleOpenEdit = (v: Vendor) => {
     setEditingVendor(v);
-    setName(v.name);
-    setCategory(v.category as ExpenseCategory);
-    setContactPerson(v.contactPerson);
-    setPhone(v.phone);
-    setEmail(v.email);
-    setQuotedAmount(v.quotedAmount.toString());
-    setStatus(v.status);
-    setNotes(v.notes);
-    setBookingVerified(v.bookingVerified);
+    setFormData({
+      name: v.name,
+      category: v.category as ExpenseCategory,
+      contactPerson: v.contactPerson,
+      phone: v.phone,
+      email: v.email,
+      quotedAmount: v.quotedAmount.toString(),
+      status: v.status,
+      notes: v.notes,
+      bookingVerified: v.bookingVerified,
+    });
     setIsAddModalOpen(true);
+  };
+
+  const handleFieldChange = <K extends keyof VendorFormData>(field: K, value: VendorFormData[K]) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
   };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim()) return;
+    if (!formData.name.trim()) return;
 
-    const numericQuote = Number(quotedAmount) || 0;
+    const numericQuote = Number(formData.quotedAmount) || 0;
 
     if (editingVendor) {
       await updateVendor(editingVendor.id, {
-        name: name.trim(),
-        category,
-        contactPerson: contactPerson.trim(),
-        phone: phone.trim(),
-        email: email.trim(),
+        name: sanitizeTextInput(formData.name),
+        category: formData.category,
+        contactPerson: sanitizeTextInput(formData.contactPerson),
+        phone: sanitizeTextInput(formData.phone),
+        email: sanitizeTextInput(formData.email),
         quotedAmount: numericQuote,
-        status,
-        notes: notes.trim(),
-        bookingVerified: status === 'booked' ? bookingVerified : false,
+        status: formData.status,
+        notes: sanitizeTextInput(formData.notes),
+        bookingVerified: formData.status === 'booked' ? formData.bookingVerified : false,
       });
+      showToast('success', 'Vendor Updated', `Saved details for ${formData.name}.`);
     } else {
       await addVendor({
-        name: name.trim(),
-        category,
-        contactPerson: contactPerson.trim(),
-        phone: phone.trim(),
-        email: email.trim(),
+        name: sanitizeTextInput(formData.name),
+        category: formData.category,
+        contactPerson: sanitizeTextInput(formData.contactPerson),
+        phone: sanitizeTextInput(formData.phone),
+        email: sanitizeTextInput(formData.email),
         quotedAmount: numericQuote,
-        status,
-        notes: notes.trim(),
-        bookingVerified: status === 'booked' ? bookingVerified : false,
+        status: formData.status,
+        notes: sanitizeTextInput(formData.notes),
+        bookingVerified: formData.status === 'booked' ? formData.bookingVerified : false,
       });
+      showToast('success', 'Vendor Added', `Recorded ${formData.name} in operations directory.`);
     }
 
     setIsAddModalOpen(false);
+  };
+
+  // Safe deletion with confirmation
+  const handleDeleteVendor = async (vendorId: string, vendorName: string) => {
+    if (window.confirm(`Are you sure you want to remove contractor "${vendorName}"?`)) {
+      await deleteVendor(vendorId);
+      showToast('info', 'Contractor Removed', `Removed ${vendorName} from directory.`);
+    }
   };
 
   // Quick inline status change
@@ -175,6 +198,7 @@ export const VendorManager: React.FC = () => {
                   <select
                     value={vendor.status}
                     onChange={(e) => handleQuickStatusChange(vendor.id, e.target.value as VendorStatus)}
+                    aria-label={`Booking status for ${vendor.name}`}
                     className={`text-[11px] font-bold px-2 py-1 rounded-lg border focus:outline-none cursor-pointer transition-colors ${
                       vendor.status === 'booked'
                         ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
@@ -206,6 +230,7 @@ export const VendorManager: React.FC = () => {
                       href={`tel:${vendor.phone.replace(/\s+/g, '')}`} 
                       className="flex items-center gap-2 text-charcoal-600 hover:text-violet-800 font-medium group transition-colors"
                       title="Click to Call"
+                      aria-label={`Call ${vendor.name} at ${vendor.phone}`}
                     >
                       <Phone className="w-3.5 h-3.5 text-charcoal-400 group-hover:text-violet-600" />
                       <span>{vendor.phone}</span>
@@ -216,6 +241,7 @@ export const VendorManager: React.FC = () => {
                       href={`mailto:${vendor.email}`} 
                       className="flex items-center gap-2 text-charcoal-600 hover:text-violet-800 font-medium group transition-colors truncate"
                       title="Click to Email"
+                      aria-label={`Email ${vendor.name} at ${vendor.email}`}
                     >
                       <Mail className="w-3.5 h-3.5 text-charcoal-400 group-hover:text-violet-600" />
                       <span className="truncate">{vendor.email}</span>
@@ -243,13 +269,15 @@ export const VendorManager: React.FC = () => {
                   <button
                     onClick={() => handleOpenEdit(vendor)}
                     title="Edit Vendor"
+                    aria-label={`Edit contractor ${vendor.name}`}
                     className="p-1.5 rounded-lg text-charcoal-500 hover:text-charcoal-900 hover:bg-charcoal-100 transition-colors"
                   >
                     <Edit3 className="w-4 h-4" />
                   </button>
                   <button
-                    onClick={() => deleteVendor(vendor.id)}
+                    onClick={() => handleDeleteVendor(vendor.id, vendor.name)}
                     title="Delete Vendor"
+                    aria-label={`Delete contractor ${vendor.name}`}
                     className="p-1.5 rounded-lg text-charcoal-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
                   >
                     <Trash2 className="w-4 h-4" />
@@ -270,12 +298,15 @@ export const VendorManager: React.FC = () => {
       >
         <form onSubmit={handleSave} className="space-y-4">
           <div className="space-y-1">
-            <label className="text-xs font-semibold text-charcoal-800">Vendor / Business Name *</label>
+            <label htmlFor="vendor-name" className="text-xs font-semibold text-charcoal-800">
+              Vendor / Business Name *
+            </label>
             <input
+              id="vendor-name"
               type="text"
               required
-              value={name}
-              onChange={(e) => setName(e.target.value)}
+              value={formData.name}
+              onChange={(e) => handleFieldChange('name', e.target.value)}
               placeholder="e.g. Campus Corner Delights"
               className="w-full px-3.5 py-2.5 rounded-xl border border-charcoal-200 text-sm focus:outline-none focus:border-violet-600"
             />
@@ -283,10 +314,13 @@ export const VendorManager: React.FC = () => {
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
-              <label className="text-xs font-semibold text-charcoal-800">Category *</label>
+              <label htmlFor="vendor-category" className="text-xs font-semibold text-charcoal-800">
+                Category *
+              </label>
               <select
-                value={category}
-                onChange={(e) => setCategory(e.target.value as ExpenseCategory)}
+                id="vendor-category"
+                value={formData.category}
+                onChange={(e) => handleFieldChange('category', e.target.value as ExpenseCategory)}
                 className="w-full px-3 py-2.5 rounded-xl border border-charcoal-200 text-sm focus:outline-none focus:border-violet-600 bg-white"
               >
                 {Object.entries(CATEGORY_LABELS).map(([k, v]) => (
@@ -296,10 +330,13 @@ export const VendorManager: React.FC = () => {
             </div>
 
             <div className="space-y-1">
-              <label className="text-xs font-semibold text-charcoal-800">Booking Status</label>
+              <label htmlFor="vendor-status" className="text-xs font-semibold text-charcoal-800">
+                Booking Status
+              </label>
               <select
-                value={status}
-                onChange={(e) => setStatus(e.target.value as VendorStatus)}
+                id="vendor-status"
+                value={formData.status}
+                onChange={(e) => handleFieldChange('status', e.target.value as VendorStatus)}
                 className="w-full px-3 py-2.5 rounded-xl border border-charcoal-200 text-sm focus:outline-none focus:border-violet-600 bg-white"
               >
                 <option value="not_contacted">Not Contacted</option>
@@ -312,23 +349,29 @@ export const VendorManager: React.FC = () => {
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
-              <label className="text-xs font-semibold text-charcoal-800">Contact Person</label>
+              <label htmlFor="vendor-contact" className="text-xs font-semibold text-charcoal-800">
+                Contact Person
+              </label>
               <input
+                id="vendor-contact"
                 type="text"
-                value={contactPerson}
-                onChange={(e) => setContactPerson(e.target.value)}
+                value={formData.contactPerson}
+                onChange={(e) => handleFieldChange('contactPerson', e.target.value)}
                 placeholder="e.g. Mr. Ramesh Gupta"
                 className="w-full px-3.5 py-2.5 rounded-xl border border-charcoal-200 text-sm focus:outline-none focus:border-violet-600"
               />
             </div>
 
             <div className="space-y-1">
-              <label className="text-xs font-semibold text-charcoal-800">Quotation (₹ INR)</label>
+              <label htmlFor="vendor-quote" className="text-xs font-semibold text-charcoal-800">
+                Quotation (₹ INR)
+              </label>
               <input
+                id="vendor-quote"
                 type="number"
                 min="0"
-                value={quotedAmount}
-                onChange={(e) => setQuotedAmount(e.target.value)}
+                value={formData.quotedAmount}
+                onChange={(e) => handleFieldChange('quotedAmount', e.target.value)}
                 placeholder="11000"
                 className="w-full px-3.5 py-2.5 rounded-xl border border-charcoal-200 text-sm font-semibold focus:outline-none focus:border-violet-600"
               />
@@ -337,22 +380,28 @@ export const VendorManager: React.FC = () => {
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
-              <label className="text-xs font-semibold text-charcoal-800">Phone Number</label>
+              <label htmlFor="vendor-phone" className="text-xs font-semibold text-charcoal-800">
+                Phone Number
+              </label>
               <input
+                id="vendor-phone"
                 type="tel"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
+                value={formData.phone}
+                onChange={(e) => handleFieldChange('phone', e.target.value)}
                 placeholder="+91 98201 44521"
                 className="w-full px-3.5 py-2.5 rounded-xl border border-charcoal-200 text-sm focus:outline-none focus:border-violet-600"
               />
             </div>
 
             <div className="space-y-1">
-              <label className="text-xs font-semibold text-charcoal-800">Email Address</label>
+              <label htmlFor="vendor-email" className="text-xs font-semibold text-charcoal-800">
+                Email Address
+              </label>
               <input
+                id="vendor-email"
                 type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                value={formData.email}
+                onChange={(e) => handleFieldChange('email', e.target.value)}
                 placeholder="vendor@example.com"
                 className="w-full px-3.5 py-2.5 rounded-xl border border-charcoal-200 text-sm focus:outline-none focus:border-violet-600"
               />
@@ -360,23 +409,27 @@ export const VendorManager: React.FC = () => {
           </div>
 
           <div className="space-y-1">
-            <label className="text-xs font-semibold text-charcoal-800">Contract Notes & Advance Details</label>
+            <label htmlFor="vendor-notes" className="text-xs font-semibold text-charcoal-800">
+              Contract Notes & Advance Details
+            </label>
             <textarea
+              id="vendor-notes"
               rows={2}
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
+              value={formData.notes}
+              onChange={(e) => handleFieldChange('notes', e.target.value)}
               placeholder="e.g. Quotation includes 100 snack boxes at ₹95/box, ₹2,000 advance given..."
               className="w-full px-3 py-2 rounded-xl border border-charcoal-200 text-sm focus:outline-none focus:border-violet-600"
             />
           </div>
 
-          {status === 'booked' && (
+          {formData.status === 'booked' && (
             <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-200">
-              <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-emerald-900">
+              <label htmlFor="vendor-verified" className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-emerald-900">
                 <input
+                  id="vendor-verified"
                   type="checkbox"
-                  checked={bookingVerified}
-                  onChange={(e) => setBookingVerified(e.target.checked)}
+                  checked={formData.bookingVerified}
+                  onChange={(e) => handleFieldChange('bookingVerified', e.target.checked)}
                   className="rounded text-emerald-700 focus:ring-emerald-500"
                 />
                 <span>I have manually verified and confirmed this booking with the vendor.</span>

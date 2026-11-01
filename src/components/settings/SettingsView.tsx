@@ -191,7 +191,7 @@ ALTER TABLE public.vendors ENABLE ROW LEVEL SECURITY;`;
 
         <form onSubmit={handleSaveApiKey} className="space-y-4">
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-charcoal-800 flex items-center justify-between">
+            <label htmlFor="gemini-key" className="text-xs font-semibold text-charcoal-800 flex items-center justify-between">
               <span className="flex items-center gap-1.5">
                 <Key className="w-3.5 h-3.5 text-violet-700" />
                 <span>Google Gemini API Key (Optional Client Override)</span>
@@ -209,6 +209,7 @@ ALTER TABLE public.vendors ENABLE ROW LEVEL SECURITY;`;
 
             <div className="flex gap-2">
               <input
+                id="gemini-key"
                 type="password"
                 value={apiKeyInput}
                 onChange={(e) => setApiKeyInput(e.target.value)}

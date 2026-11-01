@@ -8,13 +8,18 @@ export const ToastContainer: React.FC = () => {
   if (toasts.length === 0) return null;
 
   return (
-    <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-3 max-w-md w-full pointer-events-none">
+    <div 
+      role="region" 
+      aria-label="Notifications" 
+      aria-live="polite" 
+      className="fixed bottom-6 right-6 z-50 flex flex-col gap-3 max-w-md w-full pointer-events-none"
+    >
       {toasts.map((toast) => {
         const icons = {
-          success: <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />,
-          error: <AlertCircle className="w-5 h-5 text-rose-600 shrink-0" />,
-          warning: <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0" />,
-          info: <Info className="w-5 h-5 text-violet-600 shrink-0" />,
+          success: <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" aria-hidden="true" />,
+          error: <AlertCircle className="w-5 h-5 text-rose-600 shrink-0" aria-hidden="true" />,
+          warning: <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0" aria-hidden="true" />,
+          info: <Info className="w-5 h-5 text-violet-600 shrink-0" aria-hidden="true" />,
         };
 
         const bgBorders = {
@@ -27,6 +32,7 @@ export const ToastContainer: React.FC = () => {
         return (
           <div
             key={toast.id}
+            role={toast.type === 'error' ? 'alert' : 'status'}
             className={`pointer-events-auto flex items-start gap-3 p-4 rounded-xl border shadow-card transition-all duration-200 animate-in slide-in-from-bottom-5 ${bgBorders[toast.type]}`}
           >
             {icons[toast.type]}
@@ -37,7 +43,9 @@ export const ToastContainer: React.FC = () => {
               )}
             </div>
             <button
+              type="button"
               onClick={() => removeToast(toast.id)}
+              aria-label="Dismiss notification"
               className="text-charcoal-400 hover:text-charcoal-700 p-1 rounded-md transition-colors"
             >
               <X className="w-4 h-4" />

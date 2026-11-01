@@ -1,5 +1,6 @@
 import React from 'react';
 import { EventProvider, useEvent } from './context/EventContext';
+import { ErrorBoundary } from './components/common/ErrorBoundary';
 import { Navbar } from './components/layout/Navbar';
 import { Sidebar } from './components/layout/Sidebar';
 import { LandingPage } from './components/landing/LandingPage';
@@ -20,7 +21,7 @@ const AppContent: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-background flex flex-col items-center justify-center space-y-4">
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center space-y-4" role="status" aria-live="polite">
         <div className="w-12 h-12 rounded-2xl bg-violet-800 text-white flex items-center justify-center font-bold text-xl animate-pulse">
           PB
         </div>
@@ -35,8 +36,14 @@ const AppContent: React.FC = () => {
   if (currentTab === 'landing') {
     return (
       <div className="min-h-screen flex flex-col bg-background">
+        <a 
+          href="#main-content" 
+          className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 z-50 bg-violet-800 text-white px-4 py-2 rounded-xl text-xs font-bold shadow-elevated focus:outline-none"
+        >
+          Skip to main content
+        </a>
         <Navbar />
-        <main className="flex-1">
+        <main id="main-content" className="flex-1 focus:outline-none" tabIndex={-1}>
           <LandingPage />
         </main>
         <EmergencyModeModal />
@@ -48,12 +55,18 @@ const AppContent: React.FC = () => {
   // Dashboard & App Views have Sidebar layout
   return (
     <div className="min-h-screen flex flex-col bg-background">
+      <a 
+        href="#main-content" 
+        className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 z-50 bg-violet-800 text-white px-4 py-2 rounded-xl text-xs font-bold shadow-elevated focus:outline-none"
+      >
+        Skip to main content
+      </a>
       <Navbar />
 
       <div className="flex-1 flex max-w-7xl w-full mx-auto">
         <Sidebar />
 
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 min-w-0 overflow-y-auto">
+        <main id="main-content" className="flex-1 p-4 sm:p-6 lg:p-8 min-w-0 overflow-y-auto focus:outline-none" tabIndex={-1}>
           {currentTab === 'overview' && <DashboardOverview />}
           {currentTab === 'my-events' && <MyEventsView />}
           {currentTab === 'create-event' && <EventCreationForm />}
@@ -74,9 +87,11 @@ const AppContent: React.FC = () => {
 
 export const App: React.FC = () => {
   return (
-    <EventProvider>
-      <AppContent />
-    </EventProvider>
+    <ErrorBoundary>
+      <EventProvider>
+        <AppContent />
+      </EventProvider>
+    </ErrorBoundary>
   );
 };
 

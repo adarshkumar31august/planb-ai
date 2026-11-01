@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useEvent } from '../../context/EventContext';
-import { EventFormData, validateEventForm, ValidationErrors } from '../../utils/validators';
+import { EventFormData, validateEventForm, ValidationErrors, sanitizeTextInput } from '../../utils/validators';
 import { EventType, VenuePreference, ExpenseItem, EventTask } from '../../types';
 import { 
   Sparkles, 
@@ -228,16 +228,16 @@ export const EventCreationForm: React.FC = () => {
         : initialTasks;
 
       await createEvent({
-        name: formData.name.trim(),
+        name: sanitizeTextInput(formData.name),
         type: formData.type as EventType,
         date: formData.date,
-        time: formData.time || '18:00 - 22:00',
-        location: formData.location.trim(),
+        time: formData.time ? sanitizeTextInput(formData.time) : '18:00 - 22:00',
+        location: sanitizeTextInput(formData.location),
         guestCount: numericGuests,
         totalBudget: numericBudget,
         venuePreference: formData.venuePreference as VenuePreference,
-        theme: formData.theme?.trim(),
-        notes: formData.notes?.trim(),
+        theme: sanitizeTextInput(formData.theme),
+        notes: sanitizeTextInput(formData.notes),
         status: 'planning',
         expenses: finalExpenses,
         tasks: finalTasks,
@@ -283,7 +283,7 @@ export const EventCreationForm: React.FC = () => {
         <form onSubmit={handleSubmit} className="pt-6 space-y-6">
           {/* Event Name */}
           <div className="space-y-1.5">
-            <label className="text-xs sm:text-sm font-semibold text-charcoal-800 flex items-center justify-between">
+            <label htmlFor="evt-name" className="text-xs sm:text-sm font-semibold text-charcoal-800 flex items-center justify-between">
               <span>Event Name *</span>
               {errors.name && (
                 <span className="text-xs text-rose-600 font-medium flex items-center gap-1">
@@ -292,6 +292,7 @@ export const EventCreationForm: React.FC = () => {
               )}
             </label>
             <input
+              id="evt-name"
               type="text"
               name="name"
               value={formData.name}
@@ -308,11 +309,12 @@ export const EventCreationForm: React.FC = () => {
           {/* Event Type & Date */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <label className="text-xs sm:text-sm font-semibold text-charcoal-800 flex items-center justify-between">
+              <label htmlFor="evt-type" className="text-xs sm:text-sm font-semibold text-charcoal-800 flex items-center justify-between">
                 <span>Event Type *</span>
                 {errors.type && <span className="text-xs text-rose-600">{errors.type}</span>}
               </label>
               <select
+                id="evt-type"
                 name="type"
                 value={formData.type}
                 onChange={handleChange}
@@ -328,11 +330,12 @@ export const EventCreationForm: React.FC = () => {
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs sm:text-sm font-semibold text-charcoal-800 flex items-center justify-between">
+              <label htmlFor="evt-date" className="text-xs sm:text-sm font-semibold text-charcoal-800 flex items-center justify-between">
                 <span>Event Date *</span>
                 {errors.date && <span className="text-xs text-rose-600">{errors.date}</span>}
               </label>
               <input
+                id="evt-date"
                 type="date"
                 name="date"
                 value={formData.date}
@@ -345,11 +348,12 @@ export const EventCreationForm: React.FC = () => {
           {/* Location & Time */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <label className="text-xs sm:text-sm font-semibold text-charcoal-800 flex items-center justify-between">
+              <label htmlFor="evt-location" className="text-xs sm:text-sm font-semibold text-charcoal-800 flex items-center justify-between">
                 <span>Location / Venue *</span>
                 {errors.location && <span className="text-xs text-rose-600">{errors.location}</span>}
               </label>
               <input
+                id="evt-location"
                 type="text"
                 name="location"
                 value={formData.location}
@@ -360,10 +364,11 @@ export const EventCreationForm: React.FC = () => {
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs sm:text-sm font-semibold text-charcoal-800">
+              <label htmlFor="evt-time" className="text-xs sm:text-sm font-semibold text-charcoal-800">
                 Event Timings
               </label>
               <input
+                id="evt-time"
                 type="text"
                 name="time"
                 value={formData.time}
@@ -377,7 +382,7 @@ export const EventCreationForm: React.FC = () => {
           {/* Guest Count & Total Budget */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <label className="text-xs sm:text-sm font-semibold text-charcoal-800 flex items-center justify-between">
+              <label htmlFor="evt-guests" className="text-xs sm:text-sm font-semibold text-charcoal-800 flex items-center justify-between">
                 <span>Number of Guests *</span>
                 {errors.guestCount && (
                   <span className="text-xs text-rose-600">{errors.guestCount}</span>
@@ -385,6 +390,7 @@ export const EventCreationForm: React.FC = () => {
               </label>
               <div className="relative">
                 <input
+                  id="evt-guests"
                   type="number"
                   name="guestCount"
                   min="1"
@@ -400,7 +406,7 @@ export const EventCreationForm: React.FC = () => {
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs sm:text-sm font-semibold text-charcoal-800 flex items-center justify-between">
+              <label htmlFor="evt-budget" className="text-xs sm:text-sm font-semibold text-charcoal-800 flex items-center justify-between">
                 <span>Total Budget in INR (₹) *</span>
                 {errors.totalBudget && (
                   <span className="text-xs text-rose-600">{errors.totalBudget}</span>
@@ -408,6 +414,7 @@ export const EventCreationForm: React.FC = () => {
               </label>
               <div className="relative">
                 <input
+                  id="evt-budget"
                   type="number"
                   name="totalBudget"
                   min="1000"
@@ -429,7 +436,7 @@ export const EventCreationForm: React.FC = () => {
             <label className="text-xs sm:text-sm font-semibold text-charcoal-800 block">
               Venue Preference *
             </label>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-3 gap-3" role="group" aria-label="Venue Preference">
               {[
                 { value: 'outdoor', label: 'Outdoor Lawn / Open Air' },
                 { value: 'indoor', label: 'Indoor Hall / Auditorium' },
@@ -454,10 +461,11 @@ export const EventCreationForm: React.FC = () => {
           {/* Theme & Additional Notes */}
           <div className="space-y-4">
             <div className="space-y-1.5">
-              <label className="text-xs sm:text-sm font-semibold text-charcoal-800">
+              <label htmlFor="evt-theme" className="text-xs sm:text-sm font-semibold text-charcoal-800">
                 Theme / Dress Code (Optional)
               </label>
               <input
+                id="evt-theme"
                 type="text"
                 name="theme"
                 value={formData.theme}
@@ -468,10 +476,11 @@ export const EventCreationForm: React.FC = () => {
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs sm:text-sm font-semibold text-charcoal-800">
+              <label htmlFor="evt-notes" className="text-xs sm:text-sm font-semibold text-charcoal-800">
                 Additional Requirements / Special Constraints
               </label>
               <textarea
+                id="evt-notes"
                 name="notes"
                 rows={3}
                 value={formData.notes}
@@ -536,6 +545,7 @@ export const EventCreationForm: React.FC = () => {
                       setAiPlan(null);
                       setUseAiAllocations(false);
                     }}
+                    aria-label="Dismiss AI plan"
                     className="text-charcoal-400 hover:text-charcoal-700"
                   >
                     <X className="w-4 h-4" />
@@ -581,8 +591,9 @@ export const EventCreationForm: React.FC = () => {
 
                 {/* AI Plan Toggle */}
                 <div className="pt-2 border-t border-charcoal-100 flex items-center justify-between">
-                  <label className="flex items-center gap-2 cursor-pointer">
+                  <label htmlFor="evt-use-ai" className="flex items-center gap-2 cursor-pointer">
                     <input
+                      id="evt-use-ai"
                       type="checkbox"
                       checked={useAiAllocations}
                       onChange={(e) => setUseAiAllocations(e.target.checked)}

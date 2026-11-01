@@ -53,9 +53,11 @@ export const Navbar: React.FC = () => {
             </button>
           )}
 
-          <div 
-            className="flex items-center gap-2.5 cursor-pointer group" 
+          <button 
+            type="button"
+            className="flex items-center gap-2.5 group text-left focus:outline-none focus:ring-2 focus:ring-violet-600 rounded-xl p-1" 
             onClick={() => setCurrentTab('landing')}
+            aria-label="PlanB AI Home"
           >
             <div className="w-9 h-9 rounded-xl bg-violet-800 text-white flex items-center justify-center font-bold shadow-subtle group-hover:bg-violet-900 transition-colors shrink-0">
               <span className="text-base tracking-tight">PB</span>
@@ -73,15 +75,19 @@ export const Navbar: React.FC = () => {
                 Every event has a plan. Great events have a Plan B.
               </p>
             </div>
-          </div>
+          </button>
         </div>
 
         {/* Center: Interactive Active Event Selector (visible on app tabs) */}
         {currentTab !== 'landing' && activeEvent && (
           <div className="relative hidden md:block">
             <button
+              type="button"
               onClick={() => setIsEventDropdownOpen(!isEventDropdownOpen)}
-              className="flex items-center gap-2.5 bg-charcoal-50 hover:bg-charcoal-100/80 border border-charcoal-200/90 rounded-xl px-3.5 py-1.5 text-xs font-medium text-charcoal-800 transition-all shadow-subtle"
+              aria-expanded={isEventDropdownOpen}
+              aria-haspopup="listbox"
+              aria-label={`Current event: ${activeEvent.name}. Click to switch celebration.`}
+              className="flex items-center gap-2.5 bg-charcoal-50 hover:bg-charcoal-100/80 border border-charcoal-200/90 rounded-xl px-3.5 py-1.5 text-xs font-medium text-charcoal-800 transition-all shadow-subtle focus:outline-none focus:ring-2 focus:ring-violet-600"
             >
               <div className="w-2 h-2 rounded-full bg-violet-600 animate-pulse" />
               <div className="text-left max-w-[220px]">
@@ -192,9 +198,11 @@ export const Navbar: React.FC = () => {
 
               {/* Reset Data Button */}
               <button
+                type="button"
                 onClick={resetToSampleData}
+                aria-label="Reset workspace to PromptWars realistic sample data"
                 title="Reset sample data"
-                className="hidden sm:inline-flex items-center gap-1 text-xs text-charcoal-500 hover:text-charcoal-800 px-2.5 py-2 rounded-lg hover:bg-charcoal-100 transition-colors"
+                className="hidden sm:inline-flex items-center gap-1 text-xs text-charcoal-500 hover:text-charcoal-800 px-2.5 py-2 rounded-lg hover:bg-charcoal-100 transition-colors focus:outline-none focus:ring-2 focus:ring-violet-600"
               >
                 <RefreshCw className="w-3.5 h-3.5" />
                 <span className="hidden md:inline">Reset</span>

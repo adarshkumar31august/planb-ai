@@ -1,5 +1,5 @@
-import { EventModel, ExpenseItem, EventTask, Vendor, PlanRevision } from '../types';
-import { SAMPLE_EVENTS } from '../data/sampleData';
+import type { EventModel, ExpenseItem, EventTask, Vendor, PlanRevision } from '../types/index.ts';
+import { SAMPLE_EVENTS } from '../data/sampleData.ts';
 
 export interface IEventRepository {
   getAllEvents(): Promise<EventModel[]>;
@@ -41,15 +41,22 @@ export class LocalStorageEventRepository implements IEventRepository {
   private loadFromStorage(): EventModel[] {
     if (!this.isBrowser()) return SAMPLE_EVENTS;
     try {
-      const data = localStorage.getItem(STORAGE_KEY);
+      const data = window.localStorage.getItem(STORAGE_KEY);
       if (!data) {
         // Initialize with realistic sample events
         this.saveToStorage(SAMPLE_EVENTS);
         return SAMPLE_EVENTS;
       }
-      return JSON.parse(data);
+      const parsed = JSON.parse(data);
+      if (!Array.isArray(parsed)) {
+        console.warn('Storage data is not a valid array, restoring sample events');
+        this.saveToStorage(SAMPLE_EVENTS);
+        return SAMPLE_EVENTS;
+      }
+      return parsed;
     } catch (e) {
       console.warn('Failed to parse PlanB events from local storage, falling back to sample data', e);
+      this.saveToStorage(SAMPLE_EVENTS);
       return SAMPLE_EVENTS;
     }
   }
@@ -57,7 +64,7 @@ export class LocalStorageEventRepository implements IEventRepository {
   private saveToStorage(events: EventModel[]): void {
     if (!this.isBrowser()) return;
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(events));
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(events));
     } catch (e) {
       console.error('Failed to save to local storage', e);
     }
@@ -301,7 +308,15 @@ export class LocalStorageEventRepository implements IEventRepository {
       throw new Error('No historical snapshot available for this revision');
     }
 
-    const previousSnapshot: EventModel = JSON.parse(revision.previousStateSnapshot);
+    let previousSnapshot: EventModel;
+    try {
+      previousSnapshot = JSON.parse(revision.previousStateSnapshot);
+      if (!previousSnapshot || typeof previousSnapshot !== 'object' || !previousSnapshot.id) {
+        throw new Error('Corrupted snapshot schema');
+      }
+    } catch {
+      throw new Error('Historical snapshot data is corrupted or invalid');
+    }
     
     // Mark revision as reverted
     revision.status = 'reverted';

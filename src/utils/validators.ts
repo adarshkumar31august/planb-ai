@@ -71,3 +71,106 @@ export function validateEventForm(data: EventFormData): { isValid: boolean; erro
     errors,
   };
 }
+
+/**
+ * Strips potentially dangerous script tags, executable HTML, and leading/trailing whitespace.
+ */
+export function sanitizeTextInput(input: string | undefined | null): string {
+  if (!input) return '';
+  return input
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+    .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '')
+    .replace(/<[^>]+>/g, '')
+    .trim();
+}
+
+/**
+ * Validates an expense item entry
+ */
+export function validateExpenseItem(data: { name: string; allocatedAmount: number | string; category: string }): {
+  isValid: boolean;
+  errors: Record<string, string>;
+} {
+  const errors: Record<string, string> = {};
+
+  if (!data.name || data.name.trim().length < 2) {
+    errors.name = 'Item title must be at least 2 characters';
+  } else if (data.name.trim().length > 80) {
+    errors.name = 'Item title must be under 80 characters';
+  }
+
+  const numericAllocated = Number(data.allocatedAmount);
+  if (isNaN(numericAllocated) || numericAllocated < 0) {
+    errors.allocatedAmount = 'Allocated amount must be a non-negative number';
+  }
+
+  if (!data.category) {
+    errors.category = 'Category is required';
+  }
+
+  return {
+    isValid: Object.keys(errors).length === 0,
+    errors,
+  };
+}
+
+/**
+ * Validates a task or operational milestone
+ */
+export function validateTaskItem(data: { title: string; dueDate?: string }): {
+  isValid: boolean;
+  errors: Record<string, string>;
+} {
+  const errors: Record<string, string> = {};
+
+  if (!data.title || data.title.trim().length < 2) {
+    errors.title = 'Milestone title must be at least 2 characters';
+  } else if (data.title.trim().length > 120) {
+    errors.title = 'Milestone title must be under 120 characters';
+  }
+
+  if (data.dueDate) {
+    const parsedDate = new Date(data.dueDate);
+    if (isNaN(parsedDate.getTime())) {
+      errors.dueDate = 'Please provide a valid deadline date';
+    }
+  }
+
+  return {
+    isValid: Object.keys(errors).length === 0,
+    errors,
+  };
+}
+
+/**
+ * Validates a contractor or vendor record
+ */
+export function validateVendorItem(data: { name: string; quotedAmount?: number | string; email?: string; phone?: string }): {
+  isValid: boolean;
+  errors: Record<string, string>;
+} {
+  const errors: Record<string, string> = {};
+
+  if (!data.name || data.name.trim().length < 2) {
+    errors.name = 'Vendor name must be at least 2 characters';
+  }
+
+  if (data.quotedAmount !== undefined && data.quotedAmount !== '') {
+    const numericQuote = Number(data.quotedAmount);
+    if (isNaN(numericQuote) || numericQuote < 0) {
+      errors.quotedAmount = 'Quoted price must be 0 or higher';
+    }
+  }
+
+  if (data.email && data.email.trim()) {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(data.email.trim())) {
+      errors.email = 'Please provide a valid email format';
+    }
+  }
+
+  return {
+    isValid: Object.keys(errors).length === 0,
+    errors,
+  };
+}

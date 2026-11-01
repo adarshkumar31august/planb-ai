@@ -329,14 +329,16 @@ export function simulateGenericBudgetReduction(event: EventModel, reductionRate 
 }
 
 /**
- * Guest surge by 50%
+ * Guest surge by customizable ratio (default 50%)
  */
-export function simulateGuestSurge(event: EventModel): SimulationResult {
+export function simulateGuestSurge(event: EventModel, surgeRatio: number = 0.5): SimulationResult {
+  const safeRatio = Math.max(0.05, Math.min(2.0, surgeRatio));
+  const surgePercentDisplay = Math.round(safeRatio * 100);
   const proposed: EventModel = JSON.parse(JSON.stringify(event));
-  const newGuestCount = Math.round(event.guestCount * 1.5);
+  const newGuestCount = Math.round(event.guestCount * (1 + safeRatio));
   proposed.guestCount = newGuestCount;
   proposed.currentPlanVersion = event.currentPlanVersion + 1;
-  proposed.activeBackupPlan = 'Plan B: High-Capacity Guest Scaling';
+  proposed.activeBackupPlan = `Plan B: High-Capacity Guest Scaling (+${surgePercentDisplay}%)`;
 
   const changes: PlanChangeItem[] = [];
 
@@ -344,18 +346,19 @@ export function simulateGuestSurge(event: EventModel): SimulationResult {
   const cateringExp = proposed.expenses.find(e => e.category === 'catering');
   if (cateringExp) {
     const original = cateringExp.allocatedAmount;
-    // Bulk economy: per plate drops 15%, but count is 1.5x => ~1.275x
-    const scaled = Math.round(original * 1.25);
+    // Bulk economy: incremental plates benefit from ~15% volume discount
+    const cateringMultiplier = 1 + (safeRatio * 0.5);
+    const scaled = Math.round(original * cateringMultiplier);
     cateringExp.allocatedAmount = scaled;
-    cateringExp.name = `${cateringExp.name} (+50% surge to ${newGuestCount} guests)`;
+    cateringExp.name = `${cateringExp.name} (+${surgePercentDisplay}% surge to ${newGuestCount} guests)`;
     cateringExp.isModifiedByPlanB = true;
     changes.push({
       category: 'Catering & Food',
       changeType: 'increased',
       itemTitle: cateringExp.name,
-      description: `Expanded food volume for ${newGuestCount} attendees leveraging bulk catering tier.`,
+      description: `Expanded food volume for ${newGuestCount} attendees leveraging bulk catering tier (+${surgePercentDisplay}% surge).`,
       budgetDelta: scaled - original,
-      rationale: 'Negotiated 15% bulk volume discount on incremental heads.',
+      rationale: 'Negotiated bulk volume tier discounts on incremental attendee headcounts.',
     });
   }
 
@@ -363,14 +366,14 @@ export function simulateGuestSurge(event: EventModel): SimulationResult {
   const venueExp = proposed.expenses.find(e => e.category === 'venue');
   if (venueExp) {
     const original = venueExp.allocatedAmount;
-    const additional = Math.round(original * 0.2);
+    const additional = Math.round(original * Math.min(0.4, safeRatio * 0.4));
     venueExp.allocatedAmount = original + additional;
     venueExp.isModifiedByPlanB = true;
     changes.push({
       category: 'Venue & Space',
       changeType: 'increased',
       itemTitle: venueExp.name,
-      description: 'Additional seating rentals, crowd control barriers, and extended registration desks.',
+      description: `Additional seating rentals, crowd control barriers, and extended registration desks for ${newGuestCount} attendees.`,
       budgetDelta: additional,
       rationale: 'Accommodates higher footfall and ensures fire exits and circulation aisles remain clear.',
     });

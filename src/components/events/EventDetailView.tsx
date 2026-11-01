@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useEvent } from '../../context/EventContext';
 import { 
   Calendar, 
@@ -12,9 +12,7 @@ import {
   ShieldAlert,
   AlertTriangle,
   History,
-  Edit3,
-  X,
-  Save
+  Edit3
 } from 'lucide-react';
 import { Badge } from '../common/Badge';
 import { 
@@ -23,7 +21,7 @@ import {
   calculateCategoryBreakdown,
   getBudgetHealth 
 } from '../../utils/budgetCalculations';
-import { EventType, VenuePreference } from '../../types';
+import { EditEventModal } from './EditEventModal';
 
 export const EventDetailView: React.FC = () => {
   const { 
@@ -37,91 +35,32 @@ export const EventDetailView: React.FC = () => {
   } = useEvent();
 
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-  const [editForm, setEditForm] = useState<{
-    name: string;
-    type: EventType;
-    date: string;
-    time: string;
-    location: string;
-    guestCount: number;
-    totalBudget: number;
-    venuePreference: VenuePreference;
-    theme: string;
-    notes: string;
-  }>({
-    name: '',
-    type: 'college',
-    date: '',
-    time: '',
-    location: '',
-    guestCount: 100,
-    totalBudget: 25000,
-    venuePreference: 'outdoor',
-    theme: '',
-    notes: '',
-  });
 
-  const openEditModal = () => {
-    if (!activeEvent) return;
-    setEditForm({
-      name: activeEvent.name,
-      type: activeEvent.type,
-      date: activeEvent.date,
-      time: activeEvent.time || '',
-      location: activeEvent.location,
-      guestCount: activeEvent.guestCount,
-      totalBudget: activeEvent.totalBudget,
-      venuePreference: activeEvent.venuePreference,
-      theme: activeEvent.theme || '',
-      notes: activeEvent.notes || '',
-    });
-    setIsEditModalOpen(true);
-  };
+  const totalAllocated = useMemo(() => {
+    return activeEvent ? calculateTotalAllocated(activeEvent.expenses) : 0;
+  }, [activeEvent]);
 
-  const handleSaveEdit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!activeEvent) return;
+  const budgetHealth = useMemo(() => {
+    return activeEvent ? getBudgetHealth(activeEvent.totalBudget, totalAllocated) : {
+      status: 'healthy' as const,
+      percentUsed: 0,
+      remainingAmount: 0,
+      message: ''
+    };
+  }, [activeEvent, totalAllocated]);
 
-    if (!editForm.name.trim()) {
-      showToast('error', 'Name Required', 'Please enter an event name.');
-      return;
-    }
-    if (!editForm.date) {
-      showToast('error', 'Date Required', 'Please choose a valid event date.');
-      return;
-    }
-    if (editForm.guestCount <= 0) {
-      showToast('error', 'Invalid Guests', 'Guest count must be at least 1.');
-      return;
-    }
-    if (editForm.totalBudget <= 0) {
-      showToast('error', 'Invalid Budget', 'Total budget must be a positive number.');
-      return;
-    }
+  const categoryAggregates = useMemo(() => {
+    return activeEvent ? calculateCategoryBreakdown(activeEvent.expenses, activeEvent.totalBudget) : [];
+  }, [activeEvent]);
 
-    try {
-      setIsSaving(true);
-      await updateActiveEvent({
-        name: editForm.name.trim(),
-        type: editForm.type,
-        date: editForm.date,
-        time: editForm.time.trim(),
-        location: editForm.location.trim(),
-        guestCount: Number(editForm.guestCount),
-        totalBudget: Number(editForm.totalBudget),
-        venuePreference: editForm.venuePreference,
-        theme: editForm.theme.trim(),
-        notes: editForm.notes.trim(),
-      });
-      showToast('success', 'Event Updated', 'Event baseline details have been successfully updated.');
-      setIsEditModalOpen(false);
-    } catch {
-      showToast('error', 'Update Failed', 'Could not save event details.');
-    } finally {
-      setIsSaving(false);
-    }
-  };
+  const completedTasks = useMemo(() => {
+    return activeEvent ? activeEvent.tasks.filter(t => t.status === 'completed').length : 0;
+  }, [activeEvent]);
+
+  const progressPercent = useMemo(() => {
+    if (!activeEvent || activeEvent.tasks.length === 0) return 0;
+    return Math.round((completedTasks / activeEvent.tasks.length) * 100);
+  }, [activeEvent, completedTasks]);
 
   if (!activeEvent) {
     return (
@@ -138,14 +77,10 @@ export const EventDetailView: React.FC = () => {
     );
   }
 
-  const totalAllocated = calculateTotalAllocated(activeEvent.expenses);
-  const budgetHealth = getBudgetHealth(activeEvent.totalBudget, totalAllocated);
-  const categoryAggregates = calculateCategoryBreakdown(activeEvent.expenses, activeEvent.totalBudget);
-
-  const completedTasks = activeEvent.tasks.filter(t => t.status === 'completed').length;
-  const progressPercent = activeEvent.tasks.length > 0 
-    ? Math.round((completedTasks / activeEvent.tasks.length) * 100) 
-    : 0;
+  const handleSaveEvent = async (updates: Parameters<typeof updateActiveEvent>[0]) => {
+    await updateActiveEvent(updates);
+    showToast('success', 'Event Updated', 'Event baseline details have been successfully updated.');
+  };
 
   return (
     <div className="space-y-8 animate-in fade-in duration-200">
@@ -187,7 +122,8 @@ export const EventDetailView: React.FC = () => {
           {/* Quick Actions */}
           <div className="flex flex-wrap items-center gap-3">
             <button
-              onClick={openEditModal}
+              type="button"
+              onClick={() => setIsEditModalOpen(true)}
               className="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold text-charcoal-700 bg-white hover:bg-charcoal-50 border border-charcoal-200 shadow-subtle transition-colors"
             >
               <Edit3 className="w-4 h-4 text-charcoal-500" />
@@ -481,175 +417,12 @@ export const EventDetailView: React.FC = () => {
 
       {/* Edit Event Details Modal */}
       {isEditModalOpen && (
-        <div className="fixed inset-0 bg-charcoal-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-200">
-          <div className="bg-white rounded-3xl border border-charcoal-200 shadow-2xl max-w-2xl w-full p-6 sm:p-8 space-y-6 my-8">
-            <div className="flex items-center justify-between border-b border-charcoal-100 pb-4">
-              <div>
-                <h3 className="text-xl font-bold text-charcoal-900">Edit Event Baseline</h3>
-                <p className="text-xs text-charcoal-500 mt-0.5">
-                  Update event parameters, venue logistics, and budget ceiling.
-                </p>
-              </div>
-              <button
-                onClick={() => setIsEditModalOpen(false)}
-                className="w-8 h-8 rounded-full flex items-center justify-center text-charcoal-400 hover:text-charcoal-700 hover:bg-charcoal-100 transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <form onSubmit={handleSaveEdit} className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1.5 sm:col-span-2">
-                  <label className="text-xs font-semibold text-charcoal-800">Event Title *</label>
-                  <input
-                    type="text"
-                    required
-                    value={editForm.name}
-                    onChange={(e) => setEditForm(prev => ({ ...prev, name: e.target.value }))}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-charcoal-200 text-sm text-charcoal-900 focus:outline-none focus:border-violet-600 focus:ring-2 focus:ring-violet-100"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-charcoal-800">Event Type</label>
-                  <select
-                    value={editForm.type}
-                    onChange={(e) => setEditForm(prev => ({ ...prev, type: e.target.value as EventType }))}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-charcoal-200 text-sm text-charcoal-900 focus:outline-none focus:border-violet-600 focus:ring-2 focus:ring-violet-100"
-                  >
-                    <option value="college">College Event / Farewell</option>
-                    <option value="birthday">Birthday Party</option>
-                    <option value="wedding">Wedding / Reception</option>
-                    <option value="corporate">Corporate Gala</option>
-                    <option value="family">Family Celebration</option>
-                    <option value="other">Other Celebration</option>
-                  </select>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-charcoal-800">Target Date *</label>
-                  <input
-                    type="date"
-                    required
-                    value={editForm.date}
-                    onChange={(e) => setEditForm(prev => ({ ...prev, date: e.target.value }))}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-charcoal-200 text-sm text-charcoal-900 focus:outline-none focus:border-violet-600 focus:ring-2 focus:ring-violet-100"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-charcoal-800">Timings</label>
-                  <input
-                    type="text"
-                    value={editForm.time}
-                    onChange={(e) => setEditForm(prev => ({ ...prev, time: e.target.value }))}
-                    placeholder="e.g. 16:00 - 20:30"
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-charcoal-200 text-sm text-charcoal-900 focus:outline-none focus:border-violet-600 focus:ring-2 focus:ring-violet-100"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-charcoal-800">Location / Venue</label>
-                  <input
-                    type="text"
-                    value={editForm.location}
-                    onChange={(e) => setEditForm(prev => ({ ...prev, location: e.target.value }))}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-charcoal-200 text-sm text-charcoal-900 focus:outline-none focus:border-violet-600 focus:ring-2 focus:ring-violet-100"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-charcoal-800">Expected Guests *</label>
-                  <input
-                    type="number"
-                    min="1"
-                    required
-                    value={editForm.guestCount}
-                    onChange={(e) => setEditForm(prev => ({ ...prev, guestCount: Number(e.target.value) }))}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-charcoal-200 text-sm text-charcoal-900 focus:outline-none focus:border-violet-600 focus:ring-2 focus:ring-violet-100"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-charcoal-800">Total Budget (₹ INR) *</label>
-                  <input
-                    type="number"
-                    min="1000"
-                    step="500"
-                    required
-                    value={editForm.totalBudget}
-                    onChange={(e) => setEditForm(prev => ({ ...prev, totalBudget: Number(e.target.value) }))}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-charcoal-200 text-sm text-charcoal-900 font-bold focus:outline-none focus:border-violet-600 focus:ring-2 focus:ring-violet-100"
-                  />
-                </div>
-
-                <div className="space-y-1.5 sm:col-span-2">
-                  <label className="text-xs font-semibold text-charcoal-800 block">Venue Preference</label>
-                  <div className="grid grid-cols-3 gap-2">
-                    {[
-                      { value: 'outdoor', label: 'Outdoor' },
-                      { value: 'indoor', label: 'Indoor' },
-                      { value: 'hybrid', label: 'Hybrid' },
-                    ].map((opt) => (
-                      <button
-                        key={opt.value}
-                        type="button"
-                        onClick={() => setEditForm(prev => ({ ...prev, venuePreference: opt.value as VenuePreference }))}
-                        className={`py-2 px-3 rounded-xl border text-xs font-medium transition-colors ${
-                          editForm.venuePreference === opt.value
-                            ? 'border-violet-600 bg-violet-50 text-violet-900 font-bold ring-1 ring-violet-600'
-                            : 'border-charcoal-200 text-charcoal-700 hover:bg-charcoal-50'
-                        }`}
-                      >
-                        {opt.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="space-y-1.5 sm:col-span-2">
-                  <label className="text-xs font-semibold text-charcoal-800">Theme / Dress Code</label>
-                  <input
-                    type="text"
-                    value={editForm.theme}
-                    onChange={(e) => setEditForm(prev => ({ ...prev, theme: e.target.value }))}
-                    placeholder="e.g. Retro Bollywood"
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-charcoal-200 text-sm text-charcoal-900 focus:outline-none focus:border-violet-600 focus:ring-2 focus:ring-violet-100"
-                  />
-                </div>
-
-                <div className="space-y-1.5 sm:col-span-2">
-                  <label className="text-xs font-semibold text-charcoal-800">Notes & Special Directives</label>
-                  <textarea
-                    rows={2}
-                    value={editForm.notes}
-                    onChange={(e) => setEditForm(prev => ({ ...prev, notes: e.target.value }))}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-charcoal-200 text-sm text-charcoal-900 focus:outline-none focus:border-violet-600 focus:ring-2 focus:ring-violet-100"
-                  />
-                </div>
-              </div>
-
-              <div className="pt-4 flex items-center justify-end gap-3 border-t border-charcoal-100">
-                <button
-                  type="button"
-                  onClick={() => setIsEditModalOpen(false)}
-                  className="px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold text-charcoal-600 hover:bg-charcoal-100 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSaving}
-                  className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold text-white bg-violet-800 hover:bg-violet-900 shadow-subtle transition-all disabled:opacity-50"
-                >
-                  <Save className="w-4 h-4" />
-                  <span>{isSaving ? 'Saving...' : 'Save Changes'}</span>
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+        <EditEventModal
+          isOpen={isEditModalOpen}
+          onClose={() => setIsEditModalOpen(false)}
+          event={activeEvent}
+          onSave={handleSaveEvent}
+        />
       )}
     </div>
   );

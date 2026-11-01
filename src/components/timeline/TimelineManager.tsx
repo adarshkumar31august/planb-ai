@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useEvent } from '../../context/EventContext';
 import { 
   Plus, 
@@ -12,11 +12,14 @@ import { Card } from '../common/Card';
 import { Modal } from '../common/Modal';
 import { TaskPriority, ExpenseCategory } from '../../types';
 import { CATEGORY_LABELS } from '../../utils/budgetCalculations';
+import { sanitizeTextInput } from '../../utils/validators';
+
+type TaskFilterType = 'all' | 'pending' | 'completed' | 'urgent';
 
 export const TimelineManager: React.FC = () => {
-  const { activeEvent, addTask, updateTask, deleteTask } = useEvent();
+  const { activeEvent, addTask, updateTask, deleteTask, showToast } = useEvent();
 
-  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'completed' | 'urgent'>('all');
+  const [statusFilter, setStatusFilter] = useState<TaskFilterType>('all');
   const [quickTitle, setQuickTitle] = useState('');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
@@ -29,6 +32,31 @@ export const TimelineManager: React.FC = () => {
   const [formAssignedTo, setFormAssignedTo] = useState('');
   const [formIsUrgent, setFormIsUrgent] = useState(false);
 
+  const completedCount = useMemo(
+    () => activeEvent ? activeEvent.tasks.filter(t => t.status === 'completed').length : 0,
+    [activeEvent?.tasks]
+  );
+  const urgentCount = useMemo(
+    () => activeEvent ? activeEvent.tasks.filter(t => t.isUrgent && t.status !== 'completed').length : 0,
+    [activeEvent?.tasks]
+  );
+  const progressPercent = useMemo(
+    () => (activeEvent && activeEvent.tasks.length > 0)
+      ? Math.round((completedCount / activeEvent.tasks.length) * 100) 
+      : 0,
+    [activeEvent?.tasks, completedCount]
+  );
+
+  const filteredTasks = useMemo(() => {
+    if (!activeEvent) return [];
+    return activeEvent.tasks.filter((t) => {
+      if (statusFilter === 'completed') return t.status === 'completed';
+      if (statusFilter === 'pending') return t.status !== 'completed';
+      if (statusFilter === 'urgent') return t.isUrgent && t.status !== 'completed';
+      return true;
+    });
+  }, [activeEvent?.tasks, statusFilter]);
+
   if (!activeEvent) {
     return (
       <div className="bg-white rounded-3xl p-12 text-center border border-charcoal-200">
@@ -37,26 +65,13 @@ export const TimelineManager: React.FC = () => {
     );
   }
 
-  const completedCount = activeEvent.tasks.filter(t => t.status === 'completed').length;
-  const urgentCount = activeEvent.tasks.filter(t => t.isUrgent && t.status !== 'completed').length;
-  const progressPercent = activeEvent.tasks.length > 0 
-    ? Math.round((completedCount / activeEvent.tasks.length) * 100) 
-    : 0;
-
-  const filteredTasks = activeEvent.tasks.filter((t) => {
-    if (statusFilter === 'completed') return t.status === 'completed';
-    if (statusFilter === 'pending') return t.status !== 'completed';
-    if (statusFilter === 'urgent') return t.isUrgent && t.status !== 'completed';
-    return true;
-  });
-
   // Fast inline task addition
   const handleQuickAdd = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!quickTitle.trim()) return;
 
     await addTask({
-      title: quickTitle.trim(),
+      title: sanitizeTextInput(quickTitle),
       description: 'Added via quick entry',
       category: 'general',
       dueDate: activeEvent.date,
@@ -66,6 +81,7 @@ export const TimelineManager: React.FC = () => {
       isAffectedByPlanB: false,
     });
 
+    showToast('success', 'Milestone Created', `Added "${quickTitle.trim()}" to timeline.`);
     setQuickTitle('');
   };
 
@@ -85,18 +101,26 @@ export const TimelineManager: React.FC = () => {
     if (!formTitle.trim()) return;
 
     await addTask({
-      title: formTitle.trim(),
-      description: formDesc.trim(),
+      title: sanitizeTextInput(formTitle),
+      description: sanitizeTextInput(formDesc),
       category: formCategory,
       dueDate: formDueDate || activeEvent.date,
       priority: formPriority,
       status: 'pending',
-      assignedTo: formAssignedTo.trim() || undefined,
+      assignedTo: formAssignedTo.trim() ? sanitizeTextInput(formAssignedTo) : undefined,
       isUrgent: formIsUrgent,
       isAffectedByPlanB: false,
     });
 
+    showToast('success', 'Task Scheduled', `Milestone "${formTitle.trim()}" added.`);
     setIsAddModalOpen(false);
+  };
+
+  const handleDeleteTask = async (taskId: string, taskTitle: string) => {
+    if (window.confirm(`Are you sure you want to delete task "${taskTitle}"?`)) {
+      await deleteTask(taskId);
+      showToast('info', 'Task Removed', `Deleted milestone "${taskTitle}".`);
+    }
   };
 
   // Helper for user avatar initials
@@ -180,6 +204,7 @@ export const TimelineManager: React.FC = () => {
           type="text"
           value={quickTitle}
           onChange={(e) => setQuickTitle(e.target.value)}
+          aria-label="Add a new milestone quickly"
           placeholder="Add a new milestone quickly... (e.g. Call caterer to verify 15 Jain food boxes)"
           className="w-full bg-transparent text-xs sm:text-sm text-charcoal-900 placeholder:text-charcoal-400 focus:outline-none px-2"
         />
@@ -193,16 +218,20 @@ export const TimelineManager: React.FC = () => {
       </form>
 
       {/* Filter Tabs */}
-      <div className="flex items-center gap-2 border-b border-charcoal-200 pb-3">
-        {[
-          { id: 'all', label: `All Tasks (${activeEvent.tasks.length})` },
-          { id: 'pending', label: `Pending (${activeEvent.tasks.length - completedCount})` },
-          { id: 'urgent', label: `Urgent (${urgentCount})` },
-          { id: 'completed', label: `Completed (${completedCount})` },
-        ].map(tab => (
+      <div className="flex items-center gap-2 border-b border-charcoal-200 pb-3" role="tablist" aria-label="Task status filters">
+        {(
+          [
+            { id: 'all', label: `All Tasks (${activeEvent.tasks.length})` },
+            { id: 'pending', label: `Pending (${activeEvent.tasks.length - completedCount})` },
+            { id: 'urgent', label: `Urgent (${urgentCount})` },
+            { id: 'completed', label: `Completed (${completedCount})` },
+          ] as const
+        ).map(tab => (
           <button
             key={tab.id}
-            onClick={() => setStatusFilter(tab.id as any)}
+            role="tab"
+            aria-selected={statusFilter === tab.id}
+            onClick={() => setStatusFilter(tab.id)}
             className={`px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-bold transition-all ${
               statusFilter === tab.id
                 ? 'bg-violet-800 text-white shadow-subtle'
@@ -239,6 +268,7 @@ export const TimelineManager: React.FC = () => {
                   {/* Checkbox */}
                   <button
                     onClick={() => updateTask(task.id, { status: isDone ? 'pending' : 'completed' })}
+                    aria-label={isDone ? `Mark milestone "${task.title}" as incomplete` : `Mark milestone "${task.title}" as completed`}
                     className={`w-6 h-6 rounded-lg border flex items-center justify-center shrink-0 mt-0.5 transition-colors ${
                       isDone
                         ? 'bg-emerald-600 border-emerald-600 text-white'
@@ -306,8 +336,9 @@ export const TimelineManager: React.FC = () => {
 
                   {/* Delete Action */}
                   <button
-                    onClick={() => deleteTask(task.id)}
+                    onClick={() => handleDeleteTask(task.id, task.title)}
                     title="Delete milestone"
+                    aria-label={`Delete milestone "${task.title}"`}
                     className="p-1.5 rounded-lg text-charcoal-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
                   >
                     <Trash2 className="w-4 h-4" />
@@ -328,8 +359,11 @@ export const TimelineManager: React.FC = () => {
       >
         <form onSubmit={handleSaveDetailedTask} className="space-y-4">
           <div className="space-y-1">
-            <label className="text-xs font-semibold text-charcoal-800">Task Title *</label>
+            <label htmlFor="task-title" className="text-xs font-semibold text-charcoal-800">
+              Task Title *
+            </label>
             <input
+              id="task-title"
               type="text"
               required
               value={formTitle}
@@ -340,8 +374,11 @@ export const TimelineManager: React.FC = () => {
           </div>
 
           <div className="space-y-1">
-            <label className="text-xs font-semibold text-charcoal-800">Description</label>
+            <label htmlFor="task-desc" className="text-xs font-semibold text-charcoal-800">
+              Description
+            </label>
             <textarea
+              id="task-desc"
               rows={2}
               value={formDesc}
               onChange={(e) => setFormDesc(e.target.value)}
@@ -352,10 +389,13 @@ export const TimelineManager: React.FC = () => {
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
-              <label className="text-xs font-semibold text-charcoal-800">Department</label>
+              <label htmlFor="task-category" className="text-xs font-semibold text-charcoal-800">
+                Department
+              </label>
               <select
+                id="task-category"
                 value={formCategory}
-                onChange={(e) => setFormCategory(e.target.value as any)}
+                onChange={(e) => setFormCategory(e.target.value as ExpenseCategory | 'general')}
                 className="w-full px-3 py-2.5 rounded-xl border border-charcoal-200 text-sm focus:outline-none focus:border-violet-600 bg-white"
               >
                 <option value="general">General Operations</option>
@@ -366,8 +406,11 @@ export const TimelineManager: React.FC = () => {
             </div>
 
             <div className="space-y-1">
-              <label className="text-xs font-semibold text-charcoal-800">Priority</label>
+              <label htmlFor="task-priority" className="text-xs font-semibold text-charcoal-800">
+                Priority
+              </label>
               <select
+                id="task-priority"
                 value={formPriority}
                 onChange={(e) => setFormPriority(e.target.value as TaskPriority)}
                 className="w-full px-3 py-2.5 rounded-xl border border-charcoal-200 text-sm focus:outline-none focus:border-violet-600 bg-white"
@@ -381,8 +424,11 @@ export const TimelineManager: React.FC = () => {
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
-              <label className="text-xs font-semibold text-charcoal-800">Deadline Date</label>
+              <label htmlFor="task-due" className="text-xs font-semibold text-charcoal-800">
+                Deadline Date
+              </label>
               <input
+                id="task-due"
                 type="date"
                 value={formDueDate}
                 onChange={(e) => setFormDueDate(e.target.value)}
@@ -391,8 +437,11 @@ export const TimelineManager: React.FC = () => {
             </div>
 
             <div className="space-y-1">
-              <label className="text-xs font-semibold text-charcoal-800">Assigned Person</label>
+              <label htmlFor="task-assigned" className="text-xs font-semibold text-charcoal-800">
+                Assigned Person
+              </label>
               <input
+                id="task-assigned"
                 type="text"
                 value={formAssignedTo}
                 onChange={(e) => setFormAssignedTo(e.target.value)}
@@ -403,8 +452,9 @@ export const TimelineManager: React.FC = () => {
           </div>
 
           <div className="pt-2">
-            <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-charcoal-800">
+            <label htmlFor="task-urgent" className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-charcoal-800">
               <input
+                id="task-urgent"
                 type="checkbox"
                 checked={formIsUrgent}
                 onChange={(e) => setFormIsUrgent(e.target.checked)}

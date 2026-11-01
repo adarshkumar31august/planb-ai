@@ -119,7 +119,7 @@ export const EmergencyModeModal: React.FC = () => {
               <label className="text-xs font-bold text-charcoal-500 uppercase tracking-wider block">
                 Quick Preset Crises (1-Click Fill)
               </label>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2" role="group" aria-label="Crisis presets">
                 {presets.map((p, idx) => (
                   <button
                     key={idx}
@@ -134,10 +134,11 @@ export const EmergencyModeModal: React.FC = () => {
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs sm:text-sm font-bold text-charcoal-900 block">
+              <label htmlFor="emergency-issue" className="text-xs sm:text-sm font-bold text-charcoal-900 block">
                 Describe the unexpected disruption *
               </label>
               <textarea
+                id="emergency-issue"
                 required
                 rows={3}
                 value={issueDescription}
@@ -149,11 +150,12 @@ export const EmergencyModeModal: React.FC = () => {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <label className="text-xs sm:text-sm font-bold text-charcoal-900 block">
+                <label htmlFor="emergency-hours" className="text-xs sm:text-sm font-bold text-charcoal-900 block">
                   Time Remaining to Event Start (Hours)
                 </label>
                 <div className="relative">
                   <input
+                    id="emergency-hours"
                     type="number"
                     min="0.5"
                     step="0.5"
@@ -169,11 +171,12 @@ export const EmergencyModeModal: React.FC = () => {
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs sm:text-sm font-bold text-charcoal-900 block">
+                <label htmlFor="emergency-budget" className="text-xs sm:text-sm font-bold text-charcoal-900 block">
                   Available Emergency Petty Cash (₹ INR)
                 </label>
                 <div className="relative">
                   <input
+                    id="emergency-budget"
                     type="number"
                     min="0"
                     step="500"

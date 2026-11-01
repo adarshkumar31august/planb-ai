@@ -77,7 +77,7 @@ export const WhatIfSimulator: React.FC = () => {
 
   const handleRunCustomGuestSurge = (percent: number) => {
     setCustomGuestSurgePercent(percent);
-    const result = simulateGuestSurge(activeEvent);
+    const result = simulateGuestSurge(activeEvent, percent / 100);
     result.scenarioTitle = `Custom +${percent}% Guest Surge Plan`;
     result.scenarioDescription = `Scaled logistics and bulk catering to support +${percent}% attendees.`;
     setSimulationResult(result);

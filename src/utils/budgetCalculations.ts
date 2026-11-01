@@ -103,15 +103,15 @@ export function calculateCategoryBreakdown(
 
   return categories
     .map((cat) => {
-      const data = map.get(cat)!;
+      const data = map.get(cat) || { allocated: 0, actual: 0, count: 0 };
       const percentageOfTotal = Math.round((data.allocated / baseForPercentage) * 100);
       return {
         category: cat,
-        label: CATEGORY_LABELS[cat],
+        label: CATEGORY_LABELS[cat] || cat,
         allocated: data.allocated,
         actual: data.actual,
         percentageOfTotal,
-        color: CATEGORY_COLORS[cat],
+        color: CATEGORY_COLORS[cat] || '#6B7280',
         itemCount: data.count,
       };
     })
@@ -188,20 +188,28 @@ export function calculateBudgetDelta(
     'other',
   ];
 
-  const categoryBreakdown = categories.map((cat) => {
-    const origCat = originalExpenses
-      .filter((e) => e.category === cat)
-      .reduce((s, e) => s + (Number(e.allocatedAmount) || 0), 0);
-    const propCat = proposedExpenses
-      .filter((e) => e.category === cat)
-      .reduce((s, e) => s + (Number(e.allocatedAmount) || 0), 0);
-    return {
-      category: cat,
-      original: origCat,
-      proposed: propCat,
-      delta: propCat - origCat,
-    };
-  }).filter((c) => c.original > 0 || c.proposed > 0);
+  const origMap = new Map<ExpenseCategory, number>();
+  const propMap = new Map<ExpenseCategory, number>();
+
+  for (const e of originalExpenses) {
+    origMap.set(e.category, (origMap.get(e.category) || 0) + (Number(e.allocatedAmount) || 0));
+  }
+  for (const e of proposedExpenses) {
+    propMap.set(e.category, (propMap.get(e.category) || 0) + (Number(e.allocatedAmount) || 0));
+  }
+
+  const categoryBreakdown = categories
+    .map((cat) => {
+      const original = origMap.get(cat) || 0;
+      const proposed = propMap.get(cat) || 0;
+      return {
+        category: cat,
+        original,
+        proposed,
+        delta: proposed - original,
+      };
+    })
+    .filter((c) => c.original > 0 || c.proposed > 0);
 
   const isWithinBudget = targetBudgetCap !== undefined ? proposedTotal <= targetBudgetCap : true;
 

@@ -29,6 +29,26 @@ export interface AiPlanResponse {
 
 const LOCAL_KEY_STORAGE = 'planb_user_gemini_key';
 
+interface RawAiBudgetItem {
+  category?: string;
+  name?: string;
+  allocatedAmount?: number | string;
+  priority?: ExpenseItem['priority'];
+  notes?: string;
+}
+
+interface RawAiMilestone {
+  title?: string;
+  description?: string;
+  category?: string;
+  dueDaysBeforeEvent?: number | string;
+  priority?: EventTask['priority'];
+}
+
+const VALID_CATEGORIES: ExpenseCategory[] = [
+  'venue', 'catering', 'decor', 'entertainment_av', 'photography', 'logistics', 'contingency', 'other'
+];
+
 export const aiService = {
   getUserApiKey(): string {
     if (typeof window === 'undefined') return '';
@@ -87,31 +107,38 @@ export const aiService = {
         const json = await res.json();
         if (json.success && json.plan) {
           const raw = json.plan;
-          const expenses: ExpenseItem[] = (raw.budgetAllocations || []).map((item: any, i: number) => ({
-            id: `ai-exp-${Date.now()}-${i}`,
-            eventId: '',
-            category: item.category as ExpenseCategory,
-            name: item.name,
-            allocatedAmount: Number(item.allocatedAmount) || 0,
-            actualAmount: 0,
-            paidAmount: 0,
-            priority: item.priority || 'essential',
-            notes: item.notes || 'AI allocated',
-            isModifiedByPlanB: false
-          }));
+          const expenses: ExpenseItem[] = (raw.budgetAllocations || []).map((item: RawAiBudgetItem, i: number) => {
+            const cat = item.category as ExpenseCategory;
+            const safeCategory = VALID_CATEGORIES.includes(cat) ? cat : 'other';
+            return {
+              id: `ai-exp-${Date.now()}-${i}`,
+              eventId: '',
+              category: safeCategory,
+              name: item.name || `Custom Line Item ${i + 1}`,
+              allocatedAmount: Number(item.allocatedAmount) || 0,
+              actualAmount: 0,
+              paidAmount: 0,
+              priority: item.priority || 'essential',
+              notes: item.notes || 'AI allocated',
+              isModifiedByPlanB: false
+            };
+          });
 
-          const tasks: EventTask[] = (raw.milestones || []).map((m: any, i: number) => {
+          const tasks: EventTask[] = (raw.milestones || []).map((m: RawAiMilestone, i: number) => {
             const dueDate = new Date(req.date);
             const offset = Number(m.dueDaysBeforeEvent) || (i + 1) * 2;
             dueDate.setDate(dueDate.getDate() - offset);
 
+            const mCat = m.category as ExpenseCategory;
+            const safeCat = VALID_CATEGORIES.includes(mCat) ? mCat : 'general';
+
             return {
               id: `ai-tsk-${Date.now()}-${i}`,
               eventId: '',
-              title: m.title,
-              description: m.description,
-              category: m.category || 'general',
-              dueDate: dueDate.toISOString().split('T')[0],
+              title: m.title || `Milestone ${i + 1}`,
+              description: m.description || '',
+              category: safeCat,
+              dueDate: isNaN(dueDate.getTime()) ? req.date : dueDate.toISOString().split('T')[0],
               priority: m.priority || 'medium',
               status: 'pending',
               isUrgent: m.priority === 'high'
